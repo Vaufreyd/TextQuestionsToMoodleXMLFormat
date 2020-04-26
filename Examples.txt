@@ -1,0 +1,13 @@
+
+
+This is the first question with a single good answer.
+- The question has 3 good answers.
+- The question has 2 good answers.
++ The question has 1 good answer.
+
+Second question is a multiple choice question. You must select animals:
+- a banana
++ a dog
+- a tree
++ a cat
++ a bird
