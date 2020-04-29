@@ -1,0 +1,243 @@
+<html>
+    <header>
+        <title>Text questions to Moodle XML format</title>
+    </header>
+    <body>
+            <script>
+
+            // Global variables
+            var QuestionNumber = 1;
+            var AllMultichoiceBool = true;
+            var NumberingChoice = "123";
+            var ShuffledAnswersBool = true;
+
+            function CDataExtra(Text)
+            {
+                return ('<![CDATA[' + Text + ']]>' );
+            }
+
+            function GenerateXMLQuestion( Question, Answers )
+            {
+                if ( Question === '' && Answers.length == 0 )
+                {
+                    // nothing to do
+                    return;
+                }
+
+                // Working variables
+                NumberOfAnswers = Answers.length;
+                NumberOfGoodAnswers = 0;
+
+                // Question with 1 or no answer
+                if ( Question !== '' && NumberOfAnswers <= 1 )
+                {
+                    alertstr = "Question with only 1 answer or without answer!!!!!!\n\nQuestion was:\n" + Question + "\n";
+                    for (var i = 0; i < NumberOfAnswers; i++)
+                    {
+                        alertstr += Answers[i] + "\n";
+                    }
+                    alert( alertstr );
+                    throw( alertstr );
+                }
+
+                // Count number of good answers
+                for (var i = 0; i < NumberOfAnswers; i++)
+                {
+                    if ( Answers[i][0] == '+' )
+                    {
+                        NumberOfGoodAnswers++;
+                        continue;
+                    }
+                }
+
+                // No good answers?
+                if ( NumberOfGoodAnswers == 0 )
+                {
+                    alertstr = "Question without a good answer!!!!!!\n\n" + Question + "\n";
+                    for (var i = 0; i < NumberOfAnswers; i++)
+                    {
+                        alertstr += Answers[i] + "\n";
+                    }
+                    alert( alertstr );
+                    throw( alertstr );
+                }
+
+                // Ok, at least 1 good answer and 2 answers in total, generate the question
+                XMLQuestion = '<question type="multichoice">\n';
+                XMLQuestion += '\t<name><text>' + CDataExtra(Question) + '</text></name>\n'; QuestionNumber++;
+                XMLQuestion += '\t<generalfeedback format="html"><text></text></generalfeedback>\n';
+                XMLQuestion += '\t<correctfeedback format="html"><text></text></correctfeedback>\n\t<partiallycorrectfeedback format="html"><text></text></partiallycorrectfeedback>\n\t<incorrectfeedback format="html"><text></text></incorrectfeedback>\n';
+
+                XMLQuestion += '\t<questiontext format="html">\n\t\t<text>' + CDataExtra(Question) + '</text>\n\t</questiontext>\n';
+                XMLQuestion += '\t<defaultgrade>1.0000000</defaultgrade>\n';
+                XMLQuestion += '\t<penalty>0.333333333</penalty>\n';
+                XMLQuestion += '\t<answernumbering>' + NumberingChoice + '</answernumbering>\n';
+
+                XMLQuestion += '\t<hidden>0</hidden>\n';
+                if ( AllMultichoiceBool === true || NumberOfGoodAnswers > 1 )
+                {
+                    XMLQuestion += '\t<single>false</single>\n';
+                }
+                else
+                {
+                    XMLQuestion += '\t<single>true</single>\n';
+                }
+                XMLQuestion += '\t<shuffleanswers>' + ShuffledAnswersBool.toString() + '</shuffleanswers>\n';
+
+                // Fraction
+                Fraction = (100/NumberOfGoodAnswers).toString();
+
+                // Generate questions
+                for (var i = 0; i < NumberOfAnswers; i++)
+                {
+                    // Good answer
+                    if ( Answers[i][0] == '+' )
+                    {
+                        XMLQuestion += '\t<answer fraction="' + Fraction + '"';
+                    }
+                    else
+                    {
+                        XMLQuestion += '\t<answer fraction="0" ';
+                    }
+
+                    XMLQuestion += ' format="html">\n\t\t<text>' + CDataExtra(Answers[i].replace( /^[+-]\s*/, '' )) + '</text>\n\t\t<feedback format="html"><text></text></feedback>\n\t</answer>\n';
+                }
+    
+                XMLQuestion += '</question>\n';
+
+                return XMLQuestion;
+            }
+
+            function CreateXMLFile()
+            {
+                // Get values from the form
+                filename = document.getElementById('filename').value;
+                questionlist = document.getElementById('questionlist').value;
+
+                if ( questionlist.replace(/^\s+|\s+$/g, '').replace(/\s+/g, ' ') === '' )
+                {
+                    alert( "No questions given!!!" );
+                    return;
+                }
+
+                // Working variables
+                CurrentQuestion = '';
+                CurrentAnswers = [];
+
+                // Reset global question number to 1
+                QuestionNumber = 1;
+                AllMultichoiceBool = document.getElementById("multichoice").checked;
+                NumberingChoice = document.getElementById("Numbering").value;
+                ShuffledAnswersBool = document.getElementById("shuffled").value;
+
+                // Start document with XML Prolog
+                QuestionList = '<?xml version="1.0" encoding="UTF-8"?>\n<quiz>\n\n';
+
+                // Is there a category?
+                Category = document.getElementById("category").value;
+                if ( Category != '' )
+                {
+                    QuestionList += '<!-- question: 0  -->\n<question type="category">\n\t<category><text>$course$/top</text></category>\n</question>\n';
+                    QuestionList += '<!-- question: 0  -->\n<question type="category">\n\t<category><text>$course$/top/' + CDataExtra(Category) + '</text></category>\n</question>\n\n';
+                }
+
+                // parse text to make list of questions
+                var lines = questionlist.split('\n');
+                for( var i = 0; i < lines.length; i++ )
+                {
+                        // Current line without extra spaces
+                        CurrentLine = lines[i].replace(/^\s+|\s+$/g, '').replace(/\s+/g, ' ');
+
+                        // If current line is empty, go to next lines
+                        if ( CurrentLine === '' )
+                        {
+                            continue;
+                        }
+
+                        //  console.log( CurrentLine );
+
+                        // Is it an answer line ?
+                        if ( CurrentLine[0] === '+' || CurrentLine[0] === '-' )
+                        {
+                            if ( CurrentLine.replace( /^[+-]\s*/, '' ).replace( /\s+/, '' ) === '' )
+                            {
+                                alert( "Answer (line starting with + or -) but no answer label:\nQuestion was:\n" + CurrentQuestion + "\n\nCurrent line:\n" + lines[i] );
+                                return;
+                            }
+
+                            // If CurrentQuestion is empty, answer before the question
+                            if ( CurrentQuestion === '' )
+                            {
+                                alert( "Answer (line starting with + or -) before question label\n\nCurrent line:\n" + lines[i] );
+                                return;
+                            }
+                            CurrentAnswers.push(CurrentLine);
+                        }
+                        else
+                        {
+                            // We consider it is a question
+                            if ( CurrentQuestion !== '' )
+                            {
+                                // Ok, we have a previous question
+                            
+                                // Check if previous question have answers
+                                if ( CurrentAnswers.length <= 1 )
+                                {
+                                    // Ok, we have a question but no answer from the previous one
+                                    alert( "Question with only 1 answer or without answer!!!!!!\n\nQuestion was:\n" + CurrentQuestion + "\n\nCurrent line:\n" + lines[i] );
+                                    return;
+                                }
+
+                                // Generate question (with its answer) before setting the new one
+                                QuestionList += GenerateXMLQuestion( CurrentQuestion, CurrentAnswers );
+                                // CurrentQuestion = ''; => Useless here, we will set it just below to its new value
+                                CurrentAnswers = [];
+                            }
+
+                            CurrentQuestion = CurrentLine;
+                            continue;
+                        }
+                }
+
+                // Call with last (or no) question if text area is empty
+                QuestionList += GenerateXMLQuestion( CurrentQuestion, CurrentAnswers );
+                QuestionList += '\n\n</quiz>\n';
+
+                // download the generated xml into a file called filename
+                // Code from https://ourcodeworld.com/articles/read/189/how-to-create-a-file-and-generate-a-download-with-javascript-in-the-browser-without-a-server
+                var element = document.createElement('a');
+                element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(QuestionList));
+                element.setAttribute('download', filename);
+              
+                element.style.display = 'none';
+                document.body.appendChild(element);
+              
+                element.click();
+              
+                document.body.removeChild(element);
+              }
+            </script>
+
+            <p>Step 1: You need to copy/paste the list of question within the following text area. :</p>
+            <textarea id="questionlist" style="width: 80%;height:20em;display:block;"></textarea>
+            <p>Step 2: Setup (or not) the category. If set, the category is a sub-bank of the question bank (category name can contain up to 20 letters, numbers, underscore and space):</p>
+            <input type="text" id="category" style="display:block;" size="50" pattern="[A-Za-z_0-9 ]{20}" value="">
+            <p>Step 3: Select if all questions are multichoice (thus, questions with 1 good answer will let student choose more than 1 answer):</p>
+            <input type="checkbox" id="multichoice" name="multichoice" checked><label for="multichoice">All questions are multichoice</label>
+            <p>Step 4: Select numbering of answers (default is none):</p>
+            <select id="Numbering">
+                <option value="123">1, 2, 3, ...</option>
+                <option value="abc">a, b, c, ...</option>
+                <option value="ABCD">A, B, C, ...</option>
+                <option value="iii">i, ii, iii, ...</option>
+                <option value="IIII">I, II, III, ...</option>
+                <option value="none" selected>No numbering</option>
+            </select>
+            <p>Step 5: Select if answer should be shuffled (default: yes):</p>
+            <input type="checkbox" id="shuffled" name="shuffled" checked><label for="shuffled">Shuffled answers</label>            
+            <p>Step 6: Setup (or not) filename:</p>
+            <input type="text" id="filename" style="display:block;" size="50" value="QuestionInMoodleFormat.xml">
+            <p>Step 7: Click on the button to get your file. You will be able to import it Excel, LibreOffice, Google docs, ...</p>            
+            <button onclick="CreateXMLFile();">Create import File!</button>
+    </body>
+</html>
